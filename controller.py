@@ -94,7 +94,7 @@ class NonlinearController(object):
 
         acc_cmd = p_term + d_term + acceleration_ff
         # print(-acc_cmd)
-        return np.array([-1.0, 0.0])
+        return np.array([-1.0, -1.0])
         # return -acc_cmd
 
     def roll_pitch_controller(self, acceleration_cmd, attitude, thrust_cmd):
@@ -108,8 +108,8 @@ class NonlinearController(object):
         Returns: 2-element numpy array, desired rollrate (p) and pitchrate (q) commands in radians/s
         """
         #TODO move to __init__
-        k_p_roll = 5.0
-        k_p_pitch = 5.0
+        k_p_roll = 1.0
+        k_p_pitch = 1.0
 
         (b_x_c, b_y_c) = acceleration_cmd / thrust_cmd
 
@@ -129,10 +129,10 @@ class NonlinearController(object):
         rot_rate = np.matmul(rot_mat1,
                              np.array([b_x_c_dot, b_y_c_dot]).T)
 
-        print(rot_rate)
-        return  rot_rate
+        # print(rot_rate)
+        # return rot_rate
 
-        # return np.array([0.0, 0.0])
+        return np.array([0.0, 0.0])
 
     def altitude_control(self, z_c, z_dot_c, z, z_dot, attitude,
                          z_dot_dot_c=0.0):
@@ -148,12 +148,12 @@ class NonlinearController(object):
 
         Returns: thrust command for the vehicle (+up)
         """
-        # z_c = 3
-        # z_dot_c = 0
+        z_c = 3
+        z_dot_c = 0
 
         # TODO move to __init__
         # TODO should be calculated?
-        z_k_p = 120
+        z_k_p = 75
         z_k_d = 11
 
         z_err = z_c - z
@@ -181,13 +181,13 @@ class NonlinearController(object):
             
         Returns: 3-element numpy array, desired roll moment, pitch moment, and yaw moment commands in Newtons*meters
         """
-        # (p_c, q_c, r_c) = np.array([0.0, 0.0, 0.0])
-        (p_c, q_c, r_c) = body_rate_cmd
+        (p_c, q_c, r_c) = np.array([0.0, 0.0, 0.0])
+        # (p_c, q_c, r_c) = body_rate_cmd
 
         #TODO move to __init__
-        k_p_p = 2
-        k_p_q = 2
-        k_p_r = 2
+        k_p_p = 25
+        k_p_q = 25
+        k_p_r = 10
 
         (p, q, r) = body_rate
         p_err = p_c - p
