@@ -94,8 +94,8 @@ class NonlinearController(object):
 
         acc_cmd = p_term + d_term + acceleration_ff
         # print(-acc_cmd)
-        return np.array([-1.0, -1.0])
-        # return -acc_cmd
+        # return np.array([-1.0, -1.0])
+        return -acc_cmd
 
     def roll_pitch_controller(self, acceleration_cmd, attitude, thrust_cmd):
         """ Generate the rollrate and pitchrate commands in the body frame
@@ -130,9 +130,9 @@ class NonlinearController(object):
                              np.array([b_x_c_dot, b_y_c_dot]).T)
 
         # print(rot_rate)
-        # return rot_rate
+        return rot_rate
 
-        return np.array([0.0, 0.0])
+        # return np.array([0.0, 0.0])
 
     def altitude_control(self, z_c, z_dot_c, z, z_dot, attitude,
                          z_dot_dot_c=0.0):
@@ -148,8 +148,8 @@ class NonlinearController(object):
 
         Returns: thrust command for the vehicle (+up)
         """
-        z_c = 3
-        z_dot_c = 0
+        # z_c = 3
+        # z_dot_c = 0
 
         # TODO move to __init__
         # TODO should be calculated?
@@ -181,13 +181,13 @@ class NonlinearController(object):
             
         Returns: 3-element numpy array, desired roll moment, pitch moment, and yaw moment commands in Newtons*meters
         """
-        (p_c, q_c, r_c) = np.array([0.0, 0.0, 0.0])
-        # (p_c, q_c, r_c) = body_rate_cmd
+        # (p_c, q_c, r_c) = np.array([0.0, 0.0, 0.0])
+        (p_c, q_c, r_c) = body_rate_cmd
 
         #TODO move to __init__
-        k_p_p = 25
-        k_p_q = 25
-        k_p_r = 10
+        k_p_p = 0.13
+        k_p_q = 0.13
+        k_p_r = 0.05
 
         (p, q, r) = body_rate
         p_err = p_c - p
@@ -198,7 +198,7 @@ class NonlinearController(object):
         u_bar_q = k_p_q * q_err
         u_bar_r = k_p_r * r_err
 
-        return np.array([u_bar_p, u_bar_q, u_bar_r]) * MOI
+        return np.array([u_bar_p, u_bar_q, u_bar_r]) #* MOI
         # return np.array([0.0, 0.0, 0.0])
     
     def yaw_control(self, yaw_cmd, yaw):
@@ -214,6 +214,6 @@ class NonlinearController(object):
         k_p_yaw = 1.2
         yaw_err = yaw_cmd - yaw
         r_c = k_p_yaw * yaw_err
-        return 0.0
-        # return r_c
+        # return 1.0
+        return r_c
     
