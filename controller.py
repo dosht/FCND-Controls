@@ -15,6 +15,7 @@ GRAVITY = -9.81
 MOI = np.array([0.005, 0.005, 0.01])
 MAX_THRUST = 10.0
 MAX_TORQUE = 1.0
+MAX_YAW = 2 * np.pi
 
 class NonlinearController(object):
 
@@ -108,8 +109,8 @@ class NonlinearController(object):
         Returns: 2-element numpy array, desired rollrate (p) and pitchrate (q) commands in radians/s
         """
         #TODO move to __init__
-        k_p_roll = 1.0
-        k_p_pitch = 1.0
+        k_p_roll = 8
+        k_p_pitch = 8
 
         (b_x_c, b_y_c) = acceleration_cmd / thrust_cmd
 
@@ -210,10 +211,20 @@ class NonlinearController(object):
         
         Returns: target yawrate in radians/sec
         """
-        # yaw_cmd = 10.0
-        k_p_yaw = 1.2
+
+        k_p_yaw = 5.0
+        yaw_cmd = np.mod(yaw_cmd, MAX_YAW)
+
         yaw_err = yaw_cmd - yaw
-        r_c = k_p_yaw * yaw_err
-        # return 1.0
+        r_c = k_p_yaw * bounded_yaw(yaw_err)
+        # print(f"yaw: {yaw}, yaw_cmd: {yaw_cmd} yaw_err: {yaw_err}, r_c: {r_c}")
+        # return 10
         return r_c
     
+
+def bounded_yaw(value):
+    if -np.pi < value < np.pi:
+        return value
+
+    correction = MAX_YAW * (-1 if value > 0 else 1)
+    return value + correction
