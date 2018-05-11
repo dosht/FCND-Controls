@@ -185,9 +185,9 @@ class NonlinearController(object):
         (p_c, q_c, r_c) = body_rate_cmd
 
         #TODO move to __init__
-        k_p_p = 0.13
-        k_p_q = 0.13
-        k_p_r = 0.05
+        k_p_p = 20
+        k_p_q = 20
+        k_p_r = 5
 
         (p, q, r) = body_rate
         p_err = p_c - p
@@ -198,7 +198,7 @@ class NonlinearController(object):
         u_bar_q = k_p_q * q_err
         u_bar_r = k_p_r * r_err
 
-        return np.array([u_bar_p, u_bar_q, u_bar_r]) #* MOI
+        return np.array([u_bar_p, u_bar_q, u_bar_r]) * MOI
         # return np.array([0.0, 0.0, 0.0])
     
     def yaw_control(self, yaw_cmd, yaw):
