@@ -8,7 +8,6 @@ components:
 """
 import numpy as np
 from frame_utils import euler2RM
-import math
 
 DRONE_MASS_KG = 0.5
 GRAVITY = -9.81
@@ -20,41 +19,43 @@ MAX_YAW = 2 * np.pi
 class NonlinearController(object):
 
     def __init__(self,
-                 g=GRAVITY):
+                 g=GRAVITY,
+                 m=DRONE_MASS_KG):
         """Initialize the controller object and control gains"""
         self.g = g
+        self.m = m
 
     def trajectory_control(self, position_trajectory, yaw_trajectory, time_trajectory, current_time):
         """Generate a commanded position, velocity and yaw based on the trajectory
-        
+
         Args:
             position_trajectory: list of 3-element numpy arrays, NED positions
             yaw_trajectory: list yaw commands in radians
             time_trajectory: list of times (in seconds) that correspond to the position and yaw commands
             current_time: float corresponding to the current time in seconds
-            
+
         Returns: tuple (commanded position, commanded velocity, commanded yaw)
-                
+
         """
 
         ind_min = np.argmin(np.abs(np.array(time_trajectory) - current_time))
         time_ref = time_trajectory[ind_min]
-        
-        
+
+
         if current_time < time_ref:
             position0 = position_trajectory[ind_min - 1]
             position1 = position_trajectory[ind_min]
-            
+
             time0 = time_trajectory[ind_min - 1]
             time1 = time_trajectory[ind_min]
             yaw_cmd = yaw_trajectory[ind_min - 1]
-            
+
         else:
             yaw_cmd = yaw_trajectory[ind_min]
             if ind_min >= len(position_trajectory) - 1:
                 position0 = position_trajectory[ind_min]
                 position1 = position_trajectory[ind_min]
-                
+
                 time0 = 0.0
                 time1 = 1.0
             else:
@@ -63,14 +64,14 @@ class NonlinearController(object):
                 position1 = position_trajectory[ind_min + 1]
                 time0 = time_trajectory[ind_min]
                 time1 = time_trajectory[ind_min + 1]
-            
+
         position_cmd = (position1 - position0) * \
                         (current_time - time0) / (time1 - time0) + position0
         velocity_cmd = (position1 - position0) / (time1 - time0)
-        
-        
+
+
         return (position_cmd, velocity_cmd, yaw_cmd)
-    
+
     def lateral_position_control(self, local_position_cmd, local_velocity_cmd, local_position, local_velocity,
                                acceleration_ff = np.array([0.0, 0.0])):
         """Generate horizontal acceleration commands for the vehicle in the local frame
@@ -81,12 +82,12 @@ class NonlinearController(object):
             local_position: vehicle position in the local frame [north, east]
             local_velocity: vehicle velocity in the local frame [north_velocity, east_velocity]
             acceleration_cmd: feedforward acceleration command
-            
+
         Returns: desired vehicle 2D acceleration in the local frame [north, east]
         """
         #TODO move to __init__
-        k_p = np.array([0.03, 0.03])
-        k_d = np.array([0.183, 0.183])
+        k_p = np.array([4.5, 4.5])
+        k_d = np.array([3.5, 3.5])
 
         position_err = local_position_cmd - local_position
         velocity_err = local_velocity_cmd - local_velocity
@@ -95,24 +96,24 @@ class NonlinearController(object):
 
         acc_cmd = p_term + d_term + acceleration_ff
         # print(-acc_cmd)
-        # return np.array([-1.0, -1.0])
-        return -acc_cmd
+        # return np.array([1.0, 1.0])
+        return acc_cmd
 
     def roll_pitch_controller(self, acceleration_cmd, attitude, thrust_cmd):
         """ Generate the rollrate and pitchrate commands in the body frame
-        
+
         Args:
-            target_acceleration: 2-element numpy array (north_acceleration_cmd,east_acceleration_cmd) in m/s^2
+            acceleration_cmd: 2-element numpy array (north_acceleration_cmd,east_acceleration_cmd) in m/s^2
             attitude: 3-element numpy array (roll, pitch, yaw) in radians
             thrust_cmd: vehicle thruts command in Newton
-            
+
         Returns: 2-element numpy array, desired rollrate (p) and pitchrate (q) commands in radians/s
         """
-        #TODO move to __init__
+        # #TODO move to __init__
         k_p_roll = 8
-        k_p_pitch = 8
+        k_p_pitch = 5
 
-        (b_x_c, b_y_c) = acceleration_cmd / thrust_cmd
+        (b_x_c, b_y_c) = acceleration_cmd * self.m / -thrust_cmd
 
         R = euler2RM(*attitude)
 
@@ -130,10 +131,8 @@ class NonlinearController(object):
         rot_rate = np.matmul(rot_mat1,
                              np.array([b_x_c_dot, b_y_c_dot]).T)
 
-        # print(rot_rate)
+        print(rot_rate)
         return rot_rate
-
-        # return np.array([0.0, 0.0])
 
     def altitude_control(self, z_c, z_dot_c, z, z_dot, attitude,
                          z_dot_dot_c=0.0):
@@ -154,8 +153,8 @@ class NonlinearController(object):
 
         # TODO move to __init__
         # TODO should be calculated?
-        z_k_p = 75
-        z_k_d = 11
+        z_k_p = 8
+        z_k_d = 2.3
 
         z_err = z_c - z
         z_err_dot = z_dot_c - z_dot
@@ -167,23 +166,24 @@ class NonlinearController(object):
         b_z = R[2, 2]
 
         u_1_bar = p_term + d_term + z_dot_dot_c
-        thrust = (u_1_bar - self.g) / b_z
-        feasible_thrust = min([MAX_THRUST, thrust])
-        return feasible_thrust
+        # thrust = (u_1_bar - self.g) / b_z
+        thrust = u_1_bar * self.m / b_z
+        return bounded_thrust(thrust)
 
         # return 5.5
 
     def body_rate_control(self, body_rate_cmd, body_rate):
         """ Generate the roll, pitch, yaw moment commands in the body frame
-        
+
         Args:
             body_rate_cmd: 3-element numpy array (p_cmd,q_cmd,r_cmd) in radians/second^2
             body_rate: 3-element numpy array (p,q,r) in radians/second^2
-            
+
         Returns: 3-element numpy array, desired roll moment, pitch moment, and yaw moment commands in Newtons*meters
         """
         # (p_c, q_c, r_c) = np.array([0.0, 0.0, 0.0])
         (p_c, q_c, r_c) = body_rate_cmd
+        # body_rate_cmd = np.array([0.0, 0.0, 0.0])
 
         #TODO move to __init__
         k_p_p = 20
@@ -199,16 +199,18 @@ class NonlinearController(object):
         u_bar_q = k_p_q * q_err
         u_bar_r = k_p_r * r_err
 
-        return np.array([u_bar_p, u_bar_q, u_bar_r]) * MOI
+        moment_c = np.array([u_bar_p, u_bar_q, u_bar_r]) * MOI
+
         # return np.array([0.0, 0.0, 0.0])
-    
+        return bounded_moment(moment_c)
+
     def yaw_control(self, yaw_cmd, yaw):
         """ Generate the target yawrate
-        
+
         Args:
             yaw_cmd: desired vehicle yaw in radians
             yaw: vehicle yaw in radians
-        
+
         Returns: target yawrate in radians/sec
         """
 
@@ -220,7 +222,16 @@ class NonlinearController(object):
         # print(f"yaw: {yaw}, yaw_cmd: {yaw_cmd} yaw_err: {yaw_err}, r_c: {r_c}")
         # return 10
         return r_c
-    
+
+
+def bounded_thrust(value):
+    print(f"thrust value: {value}")
+    return np.clip(value, 0.001, MAX_THRUST)
+
+
+def bounded_moment(value):
+    return np.clip(value, -MAX_TORQUE, MAX_TORQUE)
+
 
 def bounded_yaw(value):
     if -np.pi < value < np.pi:
